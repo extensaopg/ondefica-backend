@@ -35,8 +35,8 @@ async function criarUsuario(req, res) {
             }
 
             if (existente.status === 'PENDING' || existente.status === 'REJECTED') {
-                if (user.status === 'PENDING') {
-                    await reenviarEmailAprovacaoSeNecessario(user)
+                if (existente.status === 'PENDING') {
+                    await reenviarEmailAprovacaoSeNecessario(existente)
                 }
                 return res.status(409).json({
                     message: 'Este email já possui um cadastro pendente de aprovação do administrador.'
