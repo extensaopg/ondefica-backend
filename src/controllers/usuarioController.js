@@ -36,6 +36,9 @@ async function criarUsuario(req, res) {
             }
 
             if (existente.status === 'PENDING' || existente.status === 'REJECTED') {
+                if (user.status === 'PENDING') {
+                    await reenviarEmailAprovacaoSeNecessario(user)
+                }
                 return res.status(409).json({
                     message: 'Este email já possui um cadastro pendente de aprovação do administrador.'
                 })
@@ -89,12 +92,6 @@ async function ativarConta(req, res) {
         if (!user) {
             return res.status(400).json({
                 message: 'Token inválido'
-            })
-        }
-
-        if (new Date() > user.token_ativacao_expira) {
-            return res.status(400).json({
-                message: 'Token expirado'
             })
         }
 
@@ -152,6 +149,10 @@ async function login(req, res) {
         }
 
         if (user.status !== 'ACTIVE') {
+            if (user.status === 'PENDING') {
+                await reenviarEmailAprovacaoSeNecessario(user)
+            }
+
             return res.status(403).json({
                 message: 'Conta não ativada. Pendente de aprovação pelo administrador.'
             })
@@ -363,6 +364,34 @@ async function validarEmail(req, res) {
     }
 }
 
+async function reenviarEmailAprovacaoSeNecessario(user) {
+    const HORAS_REENVIO = Number(
+        process.env.HORAS_REENVIO_EMAIL_APROVACAO || 24
+    )
+    const agora = new Date()
+
+    const ultimoEnvio =
+        user.ultimo_envio_ativacao || user.createdAt
+
+    const passou24h =
+        agora.getTime() - ultimoEnvio.getTime() >=
+        1000 * 60 * 60 * HORAS_REENVIO
+
+    if (!passou24h) {
+        return false
+    }
+
+    await enviarEmailNovoUsuarioPendente({
+        nome: user.nome,
+        email: user.email,
+        token: user.token_ativacao
+    })
+
+    user.ultimo_envio_ativacao = agora
+    await user.save()
+
+    return true
+}
 
 module.exports = {
     criarUsuario,
