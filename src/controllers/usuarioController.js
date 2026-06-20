@@ -27,7 +27,6 @@ async function criarUsuario(req, res) {
         const existente = await Usuario.findOne({ email })
 
         if (existente) {
-            console.log(existente)
 
             if (existente.status === 'ACTIVE') {
                 return res.status(409).json({
@@ -88,7 +87,6 @@ async function ativarConta(req, res) {
         const { acao } = req.query // 'aprovar' | 'rejeitar'
 
         const user = await Usuario.findOne({ token_ativacao: token })
-        console.log(user)
         if (!user) {
             return res.status(400).json({
                 message: 'Token inválido'
@@ -378,6 +376,7 @@ async function reenviarEmailAprovacaoSeNecessario(user) {
         1000 * 60 * 60 * HORAS_REENVIO
 
     if (!passou24h) {
+        console.log(`Não enviou novo email de confirmação para user.nome`)
         return false
     }
     console.log(`Enviando novo email de confirmação para user.nome`)
