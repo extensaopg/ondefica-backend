@@ -72,7 +72,7 @@ async function enviarEmailNovoUsuarioPendente({ nome, email, token }) {
 
     return sendEmail(
         process.env.ADMIN_EMAIL,
-        'Onde Fica? - Novo usuário aguardando aprovação',
+        `Onde Fica? - Novo usuário aguardando aprovação  ${nome} (${email}`,
         html,
         true
     )

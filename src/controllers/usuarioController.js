@@ -380,7 +380,7 @@ async function reenviarEmailAprovacaoSeNecessario(user) {
     if (!passou24h) {
         return false
     }
-
+    console.log(`Enviando novo email de confirmação para user.nome`)
     await enviarEmailNovoUsuarioPendente({
         nome: user.nome,
         email: user.email,
