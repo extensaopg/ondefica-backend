@@ -2,6 +2,7 @@ const bcrypt = require('bcrypt')
 const crypto = require('crypto')
 const Usuario = require('../models/Usuario')
 const { enviarEmailAtivacao, enviarEmailReset } = require('../services/emailService')
+const jwt = require('jsonwebtoken')
 
 function gerarTokenComExpiracao() {
     const token = crypto.randomBytes(32).toString('hex')
@@ -192,14 +193,24 @@ async function login(req, res) {
             })
         }
 
-        req.session.user = {
-            id: user._id,
-            nome: user.nome,
-            email: user.email
-        }
+        const token = jwt.sign(
+            {
+                id: user._id,
+                nome: user.nome,
+                email: user.email
+            },
+            process.env.JWT_SECRET,
+            { expiresIn: '1d' }
+        )
 
         return res.json({
-            message: 'Login realizado com sucesso'
+            message: 'Login realizado com sucesso',
+            token,
+            user: {
+                id: user._id,
+                nome: user.nome,
+                email: user.email
+            }
         })
 
     } catch (error) {
@@ -310,45 +321,17 @@ async function resetSenha(req, res) {
 }
 
 async function me(req, res) {
-    console.log("COOKIE RECEBIDO:", req.headers.cookie)
-    console.log("SESSION:", req.session)
     try {
-        if (!req.session.user) {
-            return res.status(401).json({
-                message: 'Não autenticado'
-            })
-        }
-
-        return res.json(req.session.user)
-
+        return res.json({
+            id: req.user.id,
+            nome: req.user.nome,
+            email: req.user.email
+        })
     } catch (error) {
         console.error(error)
 
         return res.status(500).json({
             message: 'Erro ao buscar usuário'
-        })
-    }
-}
-async function logout(req, res) {
-    try {
-        req.session.destroy((err) => {
-            if (err) {
-                return res.status(500).json({
-                    message: 'Erro ao fazer logout'
-                })
-            }
-
-            res.clearCookie('connect.sid')
-
-            return res.json({
-                message: 'Logout realizado com sucesso'
-            })
-        })
-    } catch (error) {
-        console.error(error)
-
-        return res.status(500).json({
-            message: 'Erro ao fazer logout'
         })
     }
 }
@@ -429,7 +412,6 @@ module.exports = {
     esqueciSenha,
     resetSenha,
     me,
-    logout,
     validarTokenReset,
     validarEmail,
 }

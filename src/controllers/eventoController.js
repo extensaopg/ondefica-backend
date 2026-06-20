@@ -4,12 +4,14 @@ const Stand = require('../models/Stand')
 
 async function criarEvento(req, res) {
     try {
-        if (!req.session.user) return res.status(401).json({ message: 'Não autenticado' });
+        if (!req.user) {
+            return res.status(401).json({ message: 'Não autenticado' });
+        }
 
         const { descricao, data_inicio, data_fim, latitude, longitude, colaboradores } = req.body;
 
         // O criador sempre será um administrador
-        let administradoresIds = [req.session.user.id];
+        let administradoresIds = [req.user.id];
         let emailsNaoEncontrados = [];
 
         // Lógica de Colaboradores
@@ -101,7 +103,7 @@ async function buscarEventoPorId(req, res) {
 
 async function atualizarEvento(req, res) {
     try {
-        if (!req.session.user) return res.status(401).json({ message: 'Não autenticado' });
+        if (!req.user) return res.status(401).json({ message: 'Não autenticado' });
 
         const { descricao, data_inicio, data_fim, latitude, longitude, colaboradores } = req.body;
         
@@ -109,11 +111,11 @@ async function atualizarEvento(req, res) {
         if (!eventoExistente) return res.status(404).json({ message: 'Evento não encontrado' });
 
         // Apenas um admin pode editar
-        if (!eventoExistente.administradores.includes(req.session.user.id)) {
+        if (!eventoExistente.administradores.includes(req.user.id)) {
             return res.status(403).json({ message: 'Sem permissão para editar este evento' });
         }
 
-        let administradoresIds = [req.session.user.id];
+        let administradoresIds = [req.user.id];
         let emailsNaoEncontrados = [];
 
         if (colaboradores && colaboradores.length > 0) {
@@ -146,11 +148,11 @@ async function atualizarEvento(req, res) {
 async function listarMeusEventos(req, res) {
     try {
         // Verifica se o usuário está logado
-        if (!req.session.user) {
+        if (!req.user) {
             return res.status(401).json({ error: 'Não autenticado' })
         }
 
-        const userId = req.session.user.id
+        const userId = req.user.id
 
         // Busca apenas eventos onde o userId está dentro do array de administradores
         const eventos = await Evento.find({ administradores: userId })

@@ -1,6 +1,5 @@
 const express = require('express');
 const cors = require('cors');
-const session = require('express-session')
 
 const eventoRoutes = require('./routes/eventoRoutes');
 const usuarioRoutes = require('./routes/usuarioRoutes')
@@ -35,19 +34,6 @@ app.use((req, res, next) => {
     console.log("HOST:", req.headers.host)
     next()
 })
-
-app.use(session({
-    secret: process.env.SESSION_SECRET,
-    resave: false,
-    saveUninitialized: false,
-    proxy: true,
-    cookie: {
-        secure: isProd,
-        sameSite: isProd ? 'none' : 'lax',
-        httpOnly: true,
-        maxAge: 1000 * 60 * 60 * 24
-    }
-}))
 
 app.get('/', (req, res) => {
     res.send('API funcionando 🚀');
