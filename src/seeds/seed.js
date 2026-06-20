@@ -25,21 +25,21 @@ async function seed() {
                 email: 'joao@email.com',
                 telefone: '75999990001',
                 senha: '123456',
-                ativo: true
+                status: 'ACTIVE'
             },
             {
                 nome: 'Maria Souza',
                 email: 'maria@email.com',
                 telefone: '75999990002',
                 senha: '123456',
-                ativo: true
+                status: 'ACTIVE'
             },
             {
                 nome: 'Carlos Lima',
                 email: 'carlos@email.com',
                 telefone: '75999990003',
                 senha: '123456',
-                ativo: true
+                status: 'ACTIVE'
             }
         ])
 

@@ -33,42 +33,49 @@ async function sendEmail(destination, subject, body) {
         throw new Error('Falha ao enviar email')
     }
 }
-async function enviarEmailAtivacao(email, token) {
-    const link = `${process.env.FRONTEND_URL}/ativar-conta?token=${token}`
+
+async function enviarEmailNovoUsuarioPendente({ nome, email, token }) {
+
+    const painelLink = `${process.env.FRONTEND_URL}/ativar-conta?token=${token}`
 
     const html = `
     <div style="background:#f4f6f8;padding:40px 0;font-family:Arial;">
-        <div style="max-width:500px;margin:0 auto;background:#ffffff;border-radius:10px;padding:30px;box-shadow:0 2px 10px rgba(0,0,0,0.08);">
+        <div style="max-width:520px;margin:0 auto;background:#ffffff;border-radius:10px;padding:30px;box-shadow:0 2px 10px rgba(0,0,0,0.08);">
 
-            <h2 style="color:#1976d2;text-align:center;margin-bottom:10px;">
-                Ativação de Conta
+            <h2 style="color:#d32f2f;text-align:center;margin-bottom:10px;">
+                Onde Fica? - Novo Usuário Pendente
             </h2>
 
             <p style="font-size:14px;color:#555;text-align:center;">
-                Seja bem-vindo ao <strong>Onde fica?</strong> 🎉<br/>
-                Para começar, confirme sua conta clicando no botão abaixo.
+                Um novo usuário se cadastrou na plataforma <strong>Onde Fica?</strong> e aguarda sua aprovação.
             </p>
 
+            <div style="background:#f9f9f9;padding:15px;border-radius:8px;margin:20px 0;">
+                <p style="margin:5px 0;"><strong>Nome:</strong> ${nome}</p>
+                <p style="margin:5px 0;"><strong>Email:</strong> ${email}</p>
+            </div>
+
             <div style="text-align:center;margin:30px 0;">
-                <a href="${link}"
-                   style="background:#1976d2;color:#fff;padding:12px 20px;text-decoration:none;border-radius:6px;display:inline-block;font-weight:bold;">
-                   Ativar minha conta
+                <a href="${painelLink}"
+                   style="background:#1976d2;color:#fff;padding:12px 18px;text-decoration:none;border-radius:6px;font-weight:bold;">
+                   Acessar painel de aprovação
                 </a>
             </div>
 
             <p style="font-size:12px;color:#888;text-align:center;">
-                Se o botão não funcionar, copie e cole este link no navegador:
-            </p>
-
-            <p style="font-size:12px;color:#1976d2;text-align:center;word-break:break-all;">
-                ${link}
+                Você está recebendo este email porque é administrador da plataforma <strong>Onde Fica?</strong>.
             </p>
 
         </div>
     </div>
     `
 
-    return sendEmail(email, 'Ativação da conta - Onde fica?', html, true)
+    return sendEmail(
+        process.env.ADMIN_EMAIL,
+        'Onde Fica? - Novo usuário aguardando aprovação',
+        html,
+        true
+    )
 }
 
 async function enviarEmailReset(email, token) {
@@ -114,6 +121,6 @@ async function enviarEmailReset(email, token) {
 }
 
 module.exports = {
-    enviarEmailAtivacao,
+    enviarEmailNovoUsuarioPendente,
     enviarEmailReset
 }

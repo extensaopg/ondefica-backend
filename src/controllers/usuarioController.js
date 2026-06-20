@@ -1,7 +1,7 @@
 const bcrypt = require('bcrypt')
 const crypto = require('crypto')
 const Usuario = require('../models/Usuario')
-const { enviarEmailAtivacao, enviarEmailReset } = require('../services/emailService')
+const { enviarEmailNovoUsuarioPendente, enviarEmailReset } = require('../services/emailService')
 const jwt = require('jsonwebtoken')
 
 function gerarTokenComExpiracao() {
@@ -12,36 +12,6 @@ function gerarTokenComExpiracao() {
 
     return { token, expira }
 }
-
-async function processarContaNaoAtivada(user) {
-
-    const tokenValido =
-        user.token_ativacao &&
-        user.token_ativacao_expira &&
-        user.token_ativacao_expira > new Date()
-
-    if (tokenValido) {
-        return {
-            novoEmailEnviado: false
-        }
-    }
-
-    const { token, expira } = gerarTokenComExpiracao()
-
-    await enviarEmailAtivacao(user.email, token)
-
-    user.token_ativacao = token
-    user.token_ativacao_expira = expira
-
-    await user.save()
-
-    return {
-        novoEmailEnviado: true
-    }
-}
-
-
-
 
 
 async function criarUsuario(req, res) {
@@ -57,57 +27,47 @@ async function criarUsuario(req, res) {
         const existente = await Usuario.findOne({ email })
 
         if (existente) {
+            console.log(existente)
 
-            if (existente.ativo) {
+            if (existente.status === 'ACTIVE') {
                 return res.status(409).json({
-                    message: 'Email já cadastrado'
+                    message: 'Já existe um usuário com este email'
                 })
             }
 
-            try {
-                const resultado = await processarContaNaoAtivada(existente)
-
-                return res.status(
-                    resultado.novoEmailEnviado ? 201 : 200
-                ).json({
-                    message: resultado.novoEmailEnviado
-                        ? 'Novo email de ativação enviado.'
-                        : 'Sua conta ainda não foi ativada. Verifique o email enviado anteriormente.'
-                })
-            } catch (err) {
-                console.error(err)
-
-                return res.status(502).json({
-                    message: 'Erro ao enviar email de ativação. Tente novamente.'
+            if (existente.status === 'PENDING' || existente.status === 'REJECTED') {
+                return res.status(409).json({
+                    message: 'Este email já possui um cadastro pendente de aprovação do administrador.'
                 })
             }
         }
 
         const senhaHash = await bcrypt.hash(senha, 10)
 
-        const { token, expira } = gerarTokenComExpiracao()
+        const token = crypto.randomBytes(32).toString('hex')
+        const expira = new Date(Date.now() + 1000 * 60 * 60 * 24) // 24h
 
-        try {
-            await enviarEmailAtivacao(email, token)
-        } catch (err) {
-            console.error(err)
-
-            return res.status(502).json({
-                message: 'Erro ao enviar email de ativação. Tente novamente.'
-            })
-        }
-
-        await Usuario.create({
+        const payload = {
             nome,
             email,
             senha: senhaHash,
-            ativo: false,
+            status: 'PENDING',
+
             token_ativacao: token,
-            token_ativacao_expira: expira
+            token_ativacao_expira: expira,
+            ultimo_envio_ativacao: new Date()
+        }
+
+
+        await enviarEmailNovoUsuarioPendente({
+            nome: payload.nome,
+            email: payload.email,
+            token
         })
+        const novoUsuario = await Usuario.create(payload)
 
         return res.status(201).json({
-            message: 'Usuário criado! Verifique seu email para ativar a conta.'
+            message: 'Cadastro criado e enviado para aprovação do administrador.'
         })
 
     } catch (error) {
@@ -122,30 +82,53 @@ async function criarUsuario(req, res) {
 async function ativarConta(req, res) {
     try {
         const { token } = req.params
+        const { acao } = req.query // 'aprovar' | 'rejeitar'
 
         const user = await Usuario.findOne({ token_ativacao: token })
-
+        console.log(user)
         if (!user) {
             return res.status(400).json({
                 message: 'Token inválido'
             })
         }
 
-        user.ativo = true
+        if (new Date() > user.token_ativacao_expira) {
+            return res.status(400).json({
+                message: 'Token expirado'
+            })
+        }
+
+        if (user.status !== 'PENDING') {
+            return res.status(400).json({
+                message: 'Usuário já foi processado'
+            })
+        }
+
+        if (acao === 'aprovar') {
+            user.status = 'ACTIVE'
+        }
+
+        if (acao === 'rejeitar') {
+            user.status = 'REJECTED'
+        }
+
         user.token_ativacao = null
         user.token_ativacao_expira = null
 
         await user.save()
 
         return res.json({
-            message: 'Conta ativada com sucesso'
+            message:
+                acao === 'aprovar'
+                    ? 'Usuário aprovado com sucesso'
+                    : 'Usuário rejeitado com sucesso'
         })
 
     } catch (error) {
         console.error(error)
 
         return res.status(500).json({
-            message: 'Erro ao ativar conta'
+            message: 'Erro ao processar ação'
         })
     }
 }
@@ -167,22 +150,11 @@ async function login(req, res) {
                 message: 'Usuário não encontrado'
             })
         }
-        if (!user.ativo) {
-            try {
-                const resultado = await processarContaNaoAtivada(user)
 
-                return res.status(401).json({
-                    message: resultado.novoEmailEnviado
-                        ? 'Conta não ativada. Um novo email de ativação foi enviado.'
-                        : 'Conta não ativada. Verifique o email de ativação enviado anteriormente.'
-                })
-            } catch (err) {
-                console.error(err)
-
-                return res.status(502).json({
-                    message: 'Erro ao enviar email de ativação'
-                })
-            }
+        if (user.status !== 'ACTIVE') {
+            return res.status(403).json({
+                message: 'Conta não ativada. Pendente de aprovação pelo administrador.'
+            })
         }
 
         const senhaOk = await bcrypt.compare(senha, user.senha)
@@ -234,22 +206,10 @@ async function esqueciSenha(req, res) {
             })
         }
 
-        if (!user.ativo) {
-            try {
-                const resultado = await processarContaNaoAtivada(user)
-
-                return res.status(400).json({
-                    message: resultado.novoEmailEnviado
-                        ? 'Sua conta ainda não foi ativada. Um novo email de ativação foi enviado.'
-                        : 'Sua conta ainda não foi ativada. Verifique o email de ativação enviado anteriormente.'
-                })
-            } catch (err) {
-                console.error(err)
-
-                return res.status(502).json({
-                    message: 'Erro ao enviar email de ativação'
-                })
-            }
+        if (user.status !== 'ACTIVE') {
+            return res.status(403).json({
+                message: 'Conta pendente de aprovação do administrador.'
+            })
         }
 
         const { token, expira } = gerarTokenComExpiracao()
@@ -387,13 +347,11 @@ async function validarEmail(req, res) {
         if (!usuario) {
             return res.json({
                 existe: false,
-                ativo: false
             })
         }
 
         return res.json({
             existe: true,
-            ativo: usuario.ativo
         })
 
     } catch (error) {
@@ -404,6 +362,7 @@ async function validarEmail(req, res) {
         })
     }
 }
+
 
 module.exports = {
     criarUsuario,

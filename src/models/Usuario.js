@@ -5,11 +5,16 @@ const UsuarioSchema = new mongoose.Schema({
     email: { type: String, unique: true },
     senha: String,
 
-    ativo: { type: Boolean, default: false },
     token_ativacao: String,
     token_ativacao_expira: Date,
     reset_token: String,
-    reset_expira: Date
+    reset_expira: Date,
+    status: {
+        type: String,
+        enum: ['PENDING', 'ACTIVE', 'REJECTED'],
+        default: null
+    },
+    ultimo_envio_ativacao: Date
 })
 
 module.exports = mongoose.model('Usuario', UsuarioSchema)
